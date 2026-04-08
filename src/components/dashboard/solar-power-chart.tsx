@@ -21,15 +21,12 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart"
 import type { MicrogridReading } from "@/lib/types"
+import { xAxisProps } from "@/lib/chart-utils"
 
 const chartConfig = {
   PVpow: {
     label: "Power (W)",
     color: "var(--chart-1)",
-  },
-  PVvolts: {
-    label: "Voltage (V)",
-    color: "var(--chart-4)",
   },
 } satisfies ChartConfig
 
@@ -38,6 +35,8 @@ interface SolarPowerChartProps {
 }
 
 export function SolarPowerChart({ data }: SolarPowerChartProps) {
+  const xProps = xAxisProps(data)
+
   return (
     <Card>
       <CardHeader>
@@ -58,12 +57,12 @@ export function SolarPowerChart({ data }: SolarPowerChartProps) {
             </defs>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
             <XAxis
-              dataKey="time"
+              dataKey="label"
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              interval={7}
               fontSize={11}
+              {...xProps}
             />
             <YAxis
               tickLine={false}

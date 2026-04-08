@@ -46,6 +46,7 @@ function generateMockData(): MicrogridReading[] {
 
     data.push({
       time: timeStr,
+      label: timeStr,
       hour,
       PVvolts: clampNoise(pvVolts, SOLAR_POWER_THRESHOLD),
       PVcur: pvVolts > 5 ? Math.max(0, pvCur) : 0,

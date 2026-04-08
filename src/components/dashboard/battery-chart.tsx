@@ -24,15 +24,12 @@ import {
   ChartLegendContent,
 } from "@/components/ui/chart"
 import type { MicrogridReading } from "@/lib/types"
+import { xAxisProps } from "@/lib/chart-utils"
 
 const chartConfig = {
   BattPow: {
     label: "Battery Power (W)",
     color: "var(--chart-2)",
-  },
-  BattV: {
-    label: "Voltage (V)",
-    color: "var(--chart-5)",
   },
 } satisfies ChartConfig
 
@@ -41,6 +38,8 @@ interface BatteryChartProps {
 }
 
 export function BatteryChart({ data }: BatteryChartProps) {
+  const xProps = xAxisProps(data)
+
   return (
     <Card>
       <CardHeader>
@@ -61,12 +60,12 @@ export function BatteryChart({ data }: BatteryChartProps) {
             </defs>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
             <XAxis
-              dataKey="time"
+              dataKey="label"
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              interval={7}
               fontSize={11}
+              {...xProps}
             />
             <YAxis
               tickLine={false}

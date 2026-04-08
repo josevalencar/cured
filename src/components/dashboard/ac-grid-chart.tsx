@@ -22,6 +22,7 @@ import {
   ChartTooltipContent,
 } from "@/components/ui/chart"
 import type { MicrogridReading } from "@/lib/types"
+import { xAxisProps } from "@/lib/chart-utils"
 
 const chartConfig = {
   acPower: {
@@ -35,6 +36,8 @@ interface AcGridChartProps {
 }
 
 export function AcGridChart({ data }: AcGridChartProps) {
+  const xProps = xAxisProps(data)
+
   return (
     <Card>
       <CardHeader>
@@ -55,12 +58,12 @@ export function AcGridChart({ data }: AcGridChartProps) {
             </defs>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
             <XAxis
-              dataKey="time"
+              dataKey="label"
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              interval={7}
               fontSize={11}
+              {...xProps}
             />
             <YAxis
               tickLine={false}

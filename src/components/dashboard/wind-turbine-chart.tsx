@@ -23,6 +23,7 @@ import {
   ChartLegendContent,
 } from "@/components/ui/chart"
 import type { MicrogridReading } from "@/lib/types"
+import { xAxisProps } from "@/lib/chart-utils"
 
 const chartConfig = {
   HAWTrms: {
@@ -40,6 +41,8 @@ interface WindTurbineChartProps {
 }
 
 export function WindTurbineChart({ data }: WindTurbineChartProps) {
+  const xProps = xAxisProps(data)
+
   return (
     <Card>
       <CardHeader>
@@ -54,12 +57,12 @@ export function WindTurbineChart({ data }: WindTurbineChartProps) {
           <LineChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
             <CartesianGrid strokeDasharray="3 3" vertical={false} />
             <XAxis
-              dataKey="time"
+              dataKey="label"
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              interval={7}
               fontSize={11}
+              {...xProps}
             />
             <YAxis
               tickLine={false}

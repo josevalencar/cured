@@ -1,60 +1,81 @@
 "use client"
 
-import { useEffect, useState } from "react"
+import { useEffect, useState, useCallback } from "react"
 import {
-  fetchTodayReadings,
+  fetchReadings,
   computeMetrics,
 } from "@/lib/microgrid-data"
 import { getMockData, computeMetrics as computeMockMetrics } from "@/lib/mock-data"
-import type { MicrogridReading, DerivedMetrics } from "@/lib/types"
+import { downsample } from "@/lib/downsample"
+import type { MicrogridReading, DerivedMetrics, DateRange } from "@/lib/types"
 import { PublicMetrics } from "@/components/dashboard/public-metrics"
 import { SolarPowerChart } from "@/components/dashboard/solar-power-chart"
 import { BatteryChart } from "@/components/dashboard/battery-chart"
 import { WindTurbineChart } from "@/components/dashboard/wind-turbine-chart"
 import { AcGridChart } from "@/components/dashboard/ac-grid-chart"
 import { AnemometerChart } from "@/components/dashboard/anemometer-chart"
+import { DateRangeSelector } from "@/components/dashboard/date-range-selector"
+
+const RANGE_LABELS: Record<DateRange, string> = {
+  today: "today",
+  week: "past 7 days",
+  month: "past 30 days",
+}
 
 export default function Dashboard() {
-  const [data, setData] = useState<MicrogridReading[]>([])
+  const [range, setRange] = useState<DateRange>("today")
+  const [rawData, setRawData] = useState<MicrogridReading[]>([])
+  const [chartData, setChartData] = useState<MicrogridReading[]>([])
   const [metrics, setMetrics] = useState<DerivedMetrics | null>(null)
   const [isLive, setIsLive] = useState(false)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const readings = await fetchTodayReadings()
+  const loadData = useCallback(async (selectedRange: DateRange) => {
+    setLoading(true)
+    try {
+      const readings = await fetchReadings(selectedRange)
 
-        if (readings.length > 0) {
-          setData(readings)
-          setMetrics(computeMetrics(readings))
-          setIsLive(true)
-        } else {
-          // No real data yet — fall back to mock
-          const mock = getMockData()
-          setData(mock)
-          setMetrics(computeMockMetrics(mock))
-          setIsLive(false)
-        }
-      } catch {
-        // Supabase unreachable — fall back to mock
+      if (readings.length > 0) {
+        setRawData(readings)
+        setChartData(downsample(readings))
+        setMetrics(computeMetrics(readings))
+        setIsLive(true)
+      } else {
         const mock = getMockData()
-        setData(mock)
+        setRawData(mock)
+        setChartData(mock)
         setMetrics(computeMockMetrics(mock))
         setIsLive(false)
-      } finally {
-        setLoading(false)
       }
+    } catch {
+      const mock = getMockData()
+      setRawData(mock)
+      setChartData(mock)
+      setMetrics(computeMockMetrics(mock))
+      setIsLive(false)
+    } finally {
+      setLoading(false)
     }
-
-    loadData()
-
-    // Refresh every 60 seconds to pick up new readings
-    const interval = setInterval(loadData, 60_000)
-    return () => clearInterval(interval)
   }, [])
 
-  if (loading || !metrics) {
+  // Load data on mount and when range changes
+  useEffect(() => {
+    loadData(range)
+  }, [range, loadData])
+
+  // Auto-refresh every 60s (only for "today" to keep it live)
+  useEffect(() => {
+    if (range !== "today") return
+    const interval = setInterval(() => loadData("today"), 60_000)
+    return () => clearInterval(interval)
+  }, [range, loadData])
+
+  function handleRangeChange(newRange: DateRange) {
+    setRange(newRange)
+  }
+
+  // First load: show a centered spinner
+  if (!metrics) {
     return (
       <div className="flex h-64 items-center justify-center">
         <p className="text-muted-foreground">Loading microgrid data...</p>
@@ -62,8 +83,9 @@ export default function Dashboard() {
     )
   }
 
+  // Subsequent loads (range switch): keep showing stale data with an opacity hint
   return (
-    <div className="space-y-8">
+    <div className={`space-y-8 transition-opacity ${loading ? "opacity-60" : ""}`}>
       <section>
         <h2 className="mb-1 text-2xl font-semibold tracking-tight">
           Microgrid Overview
@@ -85,24 +107,40 @@ export default function Dashboard() {
       </section>
 
       <section>
-        <h2 className="mb-1 text-xl font-semibold tracking-tight">
-          Detailed Measurements
-        </h2>
-        <p className="mb-4 text-sm text-muted-foreground">
-          Time-series data from the LabVIEW data acquisition system
+        <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 className="text-xl font-semibold tracking-tight">
+              Detailed Measurements
+            </h2>
+            <p className="text-sm text-muted-foreground">
+              Time-series data from the LabVIEW data acquisition system
+              {isLive && (
+                <span className="ml-1">
+                  — {rawData.length.toLocaleString()} readings ({RANGE_LABELS[range]})
+                  {chartData.length < rawData.length && (
+                    <span>
+                      , averaged to {chartData.length} points
+                    </span>
+                  )}
+                </span>
+              )}
+            </p>
+          </div>
           {isLive && (
-            <span className="ml-1">
-              — {data.length} readings today, refreshing every 60s
-            </span>
+            <DateRangeSelector
+              value={range}
+              onChange={handleRangeChange}
+              disabled={loading}
+            />
           )}
-        </p>
+        </div>
 
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <SolarPowerChart data={data} />
-          <BatteryChart data={data} />
-          <WindTurbineChart data={data} />
-          <AcGridChart data={data} />
-          <AnemometerChart data={data} />
+          <SolarPowerChart data={chartData} />
+          <BatteryChart data={chartData} />
+          <WindTurbineChart data={chartData} />
+          <AcGridChart data={chartData} />
+          <AnemometerChart data={chartData} />
         </div>
       </section>
 

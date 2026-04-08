@@ -1,5 +1,9 @@
+export type DateRange = "today" | "week" | "month"
+
 export interface MicrogridReading {
   time: string
+  /** Display label for the x-axis — "HH:MM" for today, "Mon DD HH:MM" for longer ranges */
+  label: string
   hour: number
   PVvolts: number
   PVcur: number
