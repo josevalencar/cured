@@ -76,8 +76,9 @@ function rowToReading(row: ReadingsRow, range: DateRange): MicrogridReading {
 function rangeStartDate(range: DateRange): Date {
   const now = new Date()
   switch (range) {
-    case "today":
-      return new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    case "today": {
+      return new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0)
+    }
     case "week": {
       const d = new Date(now.getFullYear(), now.getMonth(), now.getDate())
       d.setDate(d.getDate() - 7)
@@ -180,6 +181,47 @@ export async function fetchReadings(
 /** Backward-compatible alias — fetches today's readings. */
 export async function fetchTodayReadings(): Promise<MicrogridReading[]> {
   return fetchReadings("today")
+}
+
+/**
+ * Fetch readings for a single calendar day (midnight-to-midnight, local time).
+ * `dateISO` is the "YYYY-MM-DD" string from an <input type="date">.
+ */
+export async function fetchReadingsForDate(
+  dateISO: string
+): Promise<MicrogridReading[]> {
+  const [y, m, d] = dateISO.split("-").map(Number)
+  if (!y || !m || !d) return []
+  const start = new Date(y, m - 1, d, 0, 0, 0).toISOString()
+  const end = new Date(y, m - 1, d, 23, 59, 59, 999).toISOString()
+
+  const [page1, page2] = await Promise.all([
+    supabase
+      .from("readings")
+      .select(COLUMNS)
+      .gte("recorded_at", start)
+      .lte("recorded_at", end)
+      .order("recorded_at", { ascending: true })
+      .range(0, 999),
+    supabase
+      .from("readings")
+      .select(COLUMNS)
+      .gte("recorded_at", start)
+      .lte("recorded_at", end)
+      .order("recorded_at", { ascending: true })
+      .range(1000, 1999),
+  ])
+
+  if (page1.error) {
+    console.error("Supabase query error:", page1.error.message)
+    return []
+  }
+
+  const rows = [
+    ...(page1.data as ReadingsRow[]),
+    ...((page2.data as ReadingsRow[]) ?? []),
+  ]
+  return rows.map((r) => rowToReading(r, "today"))
 }
 
 /** Compute derived metrics from readings. */

@@ -1,8 +1,8 @@
 "use client"
 
 import {
-  Area,
-  AreaChart,
+  Line,
+  LineChart,
   CartesianGrid,
   XAxis,
   YAxis,
@@ -20,8 +20,6 @@ import {
   ChartContainer,
   ChartTooltip,
   ChartTooltipContent,
-  ChartLegend,
-  ChartLegendContent,
 } from "@/components/ui/chart"
 import type { MicrogridReading } from "@/lib/types"
 import { xAxisProps } from "@/lib/chart-utils"
@@ -29,7 +27,7 @@ import { xAxisProps } from "@/lib/chart-utils"
 const chartConfig = {
   BattPow: {
     label: "Battery Power (W)",
-    color: "var(--chart-2)",
+    color: "var(--battery)",
   },
 } satisfies ChartConfig
 
@@ -43,48 +41,58 @@ export function BatteryChart({ data }: BatteryChartProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Battery Over Time</CardTitle>
+        <CardTitle>Battery</CardTitle>
         <CardDescription>
-          Battery power (W) showing charge and discharge cycles.
-          Sign convention unconfirmed - see open questions.
+          Charge and discharge power (W) — positive = charging
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ChartContainer config={chartConfig} className="h-[300px] w-full">
-          <AreaChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-            <defs>
-              <linearGradient id="battGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--chart-2)" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="var(--chart-2)" stopOpacity={0.02} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+        <ChartContainer
+          config={chartConfig}
+          className="h-[300px] w-full"
+        >
+          <LineChart
+            data={data}
+            margin={{ top: 10, right: 12, left: 0, bottom: 0 }}
+          >
+            <CartesianGrid
+              strokeDasharray="1 4"
+              vertical={false}
+              stroke="var(--rule)"
+              strokeOpacity={0.15}
+            />
             <XAxis
               dataKey="label"
               tickLine={false}
               axisLine={false}
-              tickMargin={8}
-              fontSize={11}
+              tickMargin={10}
+              fontSize={10}
+              stroke="var(--muted-foreground)"
               {...xProps}
             />
             <YAxis
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              fontSize={11}
-              tickFormatter={(v: number) => `${v}W`}
+              fontSize={10}
+              stroke="var(--muted-foreground)"
+              tickFormatter={(v: number) => `${v} W`}
             />
             <ChartTooltip content={<ChartTooltipContent />} />
-            <ChartLegend content={<ChartLegendContent />} />
-            <ReferenceLine y={0} stroke="var(--border)" strokeDasharray="3 3" />
-            <Area
-              type="linear"
-              dataKey="BattPow"
-              stroke="var(--color-BattPow)"
-              fill="url(#battGrad)"
-              strokeWidth={2}
+            <ReferenceLine
+              y={0}
+              stroke="var(--rule)"
+              strokeOpacity={0.4}
+              strokeDasharray="2 4"
             />
-          </AreaChart>
+            <Line
+              type="monotone"
+              dataKey="BattPow"
+              stroke="var(--battery)"
+              strokeWidth={2}
+              dot={false}
+            />
+          </LineChart>
         </ChartContainer>
       </CardContent>
     </Card>

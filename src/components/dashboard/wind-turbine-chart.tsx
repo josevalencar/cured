@@ -27,12 +27,12 @@ import { xAxisProps } from "@/lib/chart-utils"
 
 const chartConfig = {
   HAWTrms: {
-    label: "HAWT RMS (V)",
-    color: "var(--chart-3)",
+    label: "HAWT (horizontal axis)",
+    color: "var(--wind)",
   },
   VAWTrms: {
-    label: "VAWT RMS (V)",
-    color: "var(--chart-5)",
+    label: "VAWT (vertical axis)",
+    color: "var(--clark-red)",
   },
 } satisfies ChartConfig
 
@@ -46,44 +46,56 @@ export function WindTurbineChart({ data }: WindTurbineChartProps) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>HAWT vs. VAWT</CardTitle>
+        <CardTitle>Wind Turbines</CardTitle>
         <CardDescription>
-          Horizontal and vertical axis wind turbine RMS voltage - two
-          fundamentally different turbine architectures compared side by side
+          RMS voltage (V) from horizontal and vertical axis turbines
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ChartContainer config={chartConfig} className="h-[300px] w-full">
-          <LineChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+        <ChartContainer
+          config={chartConfig}
+          className="h-[300px] w-full"
+        >
+          <LineChart
+            data={data}
+            margin={{ top: 10, right: 12, left: 0, bottom: 0 }}
+          >
+            <CartesianGrid
+              strokeDasharray="1 4"
+              vertical={false}
+              stroke="var(--rule)"
+              strokeOpacity={0.15}
+            />
             <XAxis
               dataKey="label"
               tickLine={false}
               axisLine={false}
-              tickMargin={8}
-              fontSize={11}
+              tickMargin={10}
+              fontSize={10}
+              stroke="var(--muted-foreground)"
               {...xProps}
             />
             <YAxis
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              fontSize={11}
-              tickFormatter={(v: number) => `${v}V`}
+              fontSize={10}
+              stroke="var(--muted-foreground)"
+              tickFormatter={(v: number) => `${v} V`}
             />
             <ChartTooltip content={<ChartTooltipContent />} />
             <ChartLegend content={<ChartLegendContent />} />
             <Line
-              type="linear"
+              type="monotone"
               dataKey="HAWTrms"
-              stroke="var(--color-HAWTrms)"
+              stroke="var(--wind)"
               strokeWidth={2}
               dot={false}
             />
             <Line
-              type="linear"
+              type="monotone"
               dataKey="VAWTrms"
-              stroke="var(--color-VAWTrms)"
+              stroke="var(--clark-red)"
               strokeWidth={2}
               dot={false}
             />

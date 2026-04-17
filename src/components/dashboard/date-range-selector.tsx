@@ -1,35 +1,49 @@
 "use client"
 
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import type { DateRange } from "@/lib/types"
+import { useState } from "react"
+import { CalendarIcon } from "lucide-react"
+import { format } from "date-fns"
+import { Calendar } from "@/components/ui/calendar"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
+import { Button } from "@/components/ui/button"
 
-interface DateRangeSelectorProps {
-  value: DateRange
-  onChange: (range: DateRange) => void
+interface DatePickerProps {
+  value: Date | undefined
+  onChange: (date: Date | undefined) => void
   disabled?: boolean
 }
 
-export function DateRangeSelector({
-  value,
-  onChange,
-  disabled,
-}: DateRangeSelectorProps) {
+export function DatePicker({ value, onChange, disabled }: DatePickerProps) {
+  const [open, setOpen] = useState(false)
+
   return (
-    <Tabs
-      value={value}
-      onValueChange={(v) => onChange(v as DateRange)}
-    >
-      <TabsList>
-        <TabsTrigger value="today" disabled={disabled}>
-          Today
-        </TabsTrigger>
-        <TabsTrigger value="week" disabled={disabled}>
-          7 Days
-        </TabsTrigger>
-        <TabsTrigger value="month" disabled={disabled}>
-          30 Days
-        </TabsTrigger>
-      </TabsList>
-    </Tabs>
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          disabled={disabled}
+          className="w-[200px] justify-start gap-2 text-left font-normal"
+        >
+          <CalendarIcon className="h-4 w-4 shrink-0 opacity-50" />
+          {value ? format(value, "MMMM d, yyyy") : "Pick a date"}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="end">
+        <Calendar
+          mode="single"
+          selected={value}
+          onSelect={(date) => {
+            onChange(date)
+            setOpen(false)
+          }}
+          disabled={(date) => date > new Date()}
+          initialFocus
+        />
+      </PopoverContent>
+    </Popover>
   )
 }

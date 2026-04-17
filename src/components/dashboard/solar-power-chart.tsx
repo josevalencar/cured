@@ -1,9 +1,10 @@
 "use client"
 
+import { useMemo } from "react"
 import {
-  Area,
-  AreaChart,
   CartesianGrid,
+  ComposedChart,
+  Line,
   XAxis,
   YAxis,
 } from "recharts"
@@ -17,6 +18,8 @@ import {
 import {
   type ChartConfig,
   ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
   ChartTooltip,
   ChartTooltipContent,
 } from "@/components/ui/chart"
@@ -25,8 +28,12 @@ import { xAxisProps } from "@/lib/chart-utils"
 
 const chartConfig = {
   PVpow: {
-    label: "Power (W)",
-    color: "var(--chart-1)",
+    label: "Power",
+    color: "var(--solar)",
+  },
+  energyKwh: {
+    label: "Cumulative energy",
+    color: "var(--clark-red)",
   },
 } satisfies ChartConfig
 
@@ -34,52 +41,104 @@ interface SolarPowerChartProps {
   data: MicrogridReading[]
 }
 
+function withCumulativeEnergy(data: MicrogridReading[]) {
+  let runningWh = 0
+  return data.map((r) => {
+    if (r.PVpow > 5) runningWh += r.PVpow * (1 / 60)
+    return {
+      ...r,
+      energyKwh: Number((runningWh / 1000).toFixed(3)),
+    }
+  })
+}
+
 export function SolarPowerChart({ data }: SolarPowerChartProps) {
   const xProps = xAxisProps(data)
+  const enriched = useMemo(() => withCumulativeEnergy(data), [data])
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Solar Power Curve</CardTitle>
+        <CardTitle>Solar Power</CardTitle>
         <CardDescription>
-          PV power output over 24 hours - characteristic bell-shaped irradiance
-          profile
+          PV array output (W) and cumulative energy (kWh)
         </CardDescription>
       </CardHeader>
       <CardContent>
-        <ChartContainer config={chartConfig} className="h-[300px] w-full">
-          <AreaChart data={data} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
-            <defs>
-              <linearGradient id="solarGrad" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="var(--chart-1)" stopOpacity={0.3} />
-                <stop offset="95%" stopColor="var(--chart-1)" stopOpacity={0.02} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+        <ChartContainer
+          config={chartConfig}
+          className="h-[300px] w-full"
+        >
+          <ComposedChart
+            data={enriched}
+            margin={{ top: 10, right: 12, left: 0, bottom: 0 }}
+          >
+            <CartesianGrid
+              strokeDasharray="1 4"
+              vertical={false}
+              stroke="var(--rule)"
+              strokeOpacity={0.15}
+            />
             <XAxis
               dataKey="label"
               tickLine={false}
               axisLine={false}
-              tickMargin={8}
-              fontSize={11}
+              tickMargin={10}
+              fontSize={10}
+              stroke="var(--muted-foreground)"
               {...xProps}
             />
             <YAxis
+              yAxisId="power"
               tickLine={false}
               axisLine={false}
               tickMargin={8}
-              fontSize={11}
-              tickFormatter={(v: number) => `${v}W`}
+              fontSize={10}
+              stroke="var(--solar)"
+              tickFormatter={(v: number) => `${v} W`}
             />
-            <ChartTooltip content={<ChartTooltipContent />} />
-            <Area
-              type="linear"
+            <YAxis
+              yAxisId="energy"
+              orientation="right"
+              tickLine={false}
+              axisLine={false}
+              tickMargin={8}
+              fontSize={10}
+              stroke="var(--clark-red)"
+              tickFormatter={(v: number) => `${v} kWh`}
+            />
+            <ChartTooltip
+              content={
+                <ChartTooltipContent
+                  formatter={(value, name) => {
+                    const n = Number(value)
+                    if (name === "PVpow") return [`${n.toFixed(0)} W`, "Power"]
+                    if (name === "energyKwh")
+                      return [`${n.toFixed(2)} kWh`, "Energy so far"]
+                    return [String(value), String(name)]
+                  }}
+                />
+              }
+            />
+            <ChartLegend content={<ChartLegendContent />} />
+            <Line
+              yAxisId="power"
+              type="monotone"
               dataKey="PVpow"
-              stroke="var(--color-PVpow)"
-              fill="url(#solarGrad)"
+              stroke="var(--solar)"
               strokeWidth={2}
+              dot={false}
             />
-          </AreaChart>
+            <Line
+              yAxisId="energy"
+              type="monotone"
+              dataKey="energyKwh"
+              stroke="var(--clark-red)"
+              strokeWidth={2}
+              dot={false}
+              strokeDasharray="4 3"
+            />
+          </ComposedChart>
         </ChartContainer>
       </CardContent>
     </Card>
