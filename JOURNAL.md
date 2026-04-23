@@ -524,3 +524,51 @@ Also, my original justification for the pusher included "protects the token" —
 - Goddard Library station recovery (ask Professor Agosta).
 - Anemometer daily midnight failure (monitor; decide whether to fix the VI).
 - CURED weather dashboard panel (after data accumulates).
+
+### Follow-up same day — wind correlation chart + live weather summary
+
+Once the cron started filling `weather_readings`, didn't wait for more data to accumulate — built the research-view surfaces straight away.
+
+**New chart — "Wind & Turbine Correlation"** on `/research` (6th tile in the grid, bottom-right):
+
+- Dual-Y-axis `ComposedChart` (reused the solar-power-chart pattern)
+- Left axis (MPH): WeatherFlow `wind_avg` (converted m/s→MPH) + Pi `anemometer`
+- Right axis (V): `HAWTrms` + `VAWTrms` (dashed, to separate visually)
+- `connectNulls={false}` on the WeatherFlow line so cron gaps render honestly as breaks
+- Small caption under the chart shows latest wind direction in degrees + 16-point cardinal (e.g. "310° (NW) at 13.4 mph"). Placeholder for later: once Professor Agosta confirms the turbine facing, highlight favorable wind directions.
+
+**New tile — "Weather Station"** as a dedicated section between Microgrid Overview and Detailed Measurements:
+
+- Big `°C` temperature + conditions text on the left
+- 6-stat grid: Humidity, Pressure (mmHg, converted from `sea_level_pressure` mb × 0.75006), Wind (mph + direction + cardinal), Gust, UV Index, Solar Radiation (W/m²)
+- Badge in header mirrors `conditions` field ("Clear", "Rain Possible", etc.)
+- Relative timestamp ("Updated 14s ago") so the professor can see freshness at a glance
+
+**Data plumbing — merge by minute, preserve extras through downsampling**
+
+Key architectural decision: build a new `useResearchData()` hook that fetches microgrid + weather in parallel, then merges by minute-level timestamp (`"2026-04-23T14:30"` slice of ISO string). The merged shape is `ResearchReading extends MicrogridReading`, so existing charts consume the data unchanged and the new ones see the `wf_*` fields.
+
+Downsample.ts was previously hard-coded to `MicrogridReading` — would have dropped weather fields on longer ranges. Made it generic (`downsample<T extends MicrogridReading>`) with `...mid` spread so extra fields survive. Midpoint-samples extras rather than averaging them (fine for slow-moving weather signals).
+
+Also added `recorded_at` to `MicrogridReading` (was only `time`/`label`/`hour` for display). Needed as the join key. Three construction sites updated: `rowToReading`, `zeroReadingsForDate`, `generateMockData` (all synthesize a timestamp).
+
+**Files shipped (commit `f2e4b0c`):**
+
+| Path | Change |
+|---|---|
+| `src/lib/types.ts` | Added `recorded_at` to `MicrogridReading`; new `WeatherReading` (with pressure, dew_point, feels_like); new `ResearchReading` |
+| `src/lib/microgrid-data.ts` | `rowToReading` carries `recorded_at` |
+| `src/lib/downsample.ts` | Generic over `T`, spreads `...mid` |
+| `src/lib/use-microgrid-data.ts`, `src/lib/mock-data.ts` | Synthesize `recorded_at` for zero/mock rows |
+| `src/lib/weather-data.ts` | **NEW** — Supabase fetch + m/s→MPH conversion |
+| `src/lib/use-research-data.ts` | **NEW** — parallel fetch, minute-level merge, exposes `latestWeather` |
+| `src/components/dashboard/wind-correlation-chart.tsx` | **NEW** — dual-Y-axis chart |
+| `src/components/dashboard/weather-summary.tsx` | **NEW** — current-conditions tile |
+| `src/app/research/page.tsx` | Swapped hook, added new section + 6th chart tile |
+
+Build green (`next build` passes), deployed via auto-deploy to Vercel.
+
+**Still open:**
+- Goddard Library station recovery (unchanged).
+- Anemometer midnight failure (unchanged — check tomorrow morning to see if it recurs).
+- Turbine facing direction from Professor Agosta — once known, layer direction-aware visualization onto the correlation chart.
