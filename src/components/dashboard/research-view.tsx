@@ -260,7 +260,6 @@ export function LearnSection({
                   { label: "peak VAWT", value: windStats.vawt, unit: "V" },
                   { label: "leader", value: windStats.winner },
                 ]}
-                note="Anemometer (MPH) is offline — the Raspberry Pi feeding wind speed is on a different Wi-Fi network from the iMac."
                 chart={<WindTurbineChart data={chartData} />}
               />
             </TabsContent>

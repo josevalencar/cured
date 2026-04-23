@@ -37,6 +37,7 @@ interface AnemometerChartProps {
 
 export function AnemometerChart({ data }: AnemometerChartProps) {
   const xProps = xAxisProps(data)
+  const hasData = data.some((r) => r.anemometer > 0)
 
   return (
     <Card>
@@ -49,7 +50,7 @@ export function AnemometerChart({ data }: AnemometerChartProps) {
             </CardDescription>
           </div>
           <Badge variant="outline" className="shrink-0">
-            No data — Pi network issue
+            {hasData ? "Live" : "Awaiting data"}
           </Badge>
         </div>
       </CardHeader>
@@ -83,11 +84,6 @@ export function AnemometerChart({ data }: AnemometerChartProps) {
             />
           </LineChart>
         </ChartContainer>
-        <p className="mt-3 text-xs text-muted-foreground">
-          The Raspberry Pi running AnemometerMPH22.py is currently on a
-          different Wi-Fi network than the iMac. This chart will populate
-          automatically once the network issue is resolved.
-        </p>
       </CardContent>
     </Card>
   )

@@ -318,8 +318,7 @@ export function AcademicView({
             Solar energy is computed as Σ PVpow × (1/60) / 1000 for PVpow &gt; 5
             W. CO₂ avoided uses the EPA eGRID US-average emissions factor of
             0.386 kg/kWh. Sign conventions for acPower and BattCurr are not yet
-            confirmed with Professor Agosta and are shown as recorded. Wind
-            speed (anemometer) is currently offline.
+            confirmed with Professor Agosta and are shown as recorded.
           </p>
         </section>
       </main>

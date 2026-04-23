@@ -377,3 +377,150 @@ Generated SSH key on José's MacBook and attempted to set up passwordless access
 - Monitor pipeline reliability over the next few days
 - Consider deploying CURED to Vercel (can read from Supabase from anywhere)
 - Confirm sign conventions with Professor Agosta
+
+---
+
+## Session — 2026-04-22
+
+### Anemometer pipeline fixed — Pi → iMac UDP now flowing
+
+Spent the session diagnosing why the `anemometer` column in LabVIEW's output was stuck at zero despite the Pi being "working" per Professor Agosta. Resolved end-to-end.
+
+### What we found
+
+- **Pi was on the wrong network.** On arrival, the Pi (`raspi3a@raspberrypi`) was plugged into the lab's wired Ethernet, getting IP `10.21.2.194` on subnet `10.21.0.0/22`. The iMac is on `140.232.220.180` (subnet `140.232.220.0/24`). Different VLANs.
+- **Pi was actually sending.** `AnemometerMPH22.py` was running via Thonny; console showed the UDP send block executing every 15 seconds, targeting the correct `140.232.220.180:61557`. Even with zero wind, the script sends `"0.0"` — so packets should always flow when the Pi is happy.
+- **ICMP worked, UDP didn't.** `ping` Pi → iMac = sub-millisecond latency. But `sudo tcpdump -i any -n udp port 61557` on the iMac saw zero packets over 30+ seconds.
+- **It wasn't the iMac's firewalls.** Disabled macOS app firewall (`socketfilterfw --setglobalstate off`) AND `pfctl -d`, retested → still zero packets. Local `nc -u -l 62000` + `nc -u 127.0.0.1 62000` worked, confirming the iMac's UDP stack was healthy.
+- **Conclusion: UDP is dropped at the campus routing/VLAN layer** between `10.21.0.0/22` and `140.232.220.0/24`. ICMP is permitted for diagnostics; arbitrary inter-VLAN UDP is not. This matches common campus network policies.
+
+### Fix
+
+Professor Agosta moved the Pi onto the **`solar2` Wi-Fi** (password `energy!!!`), which is on the same subnet as the iMac. UDP packets now reach LabVIEW and the `anemometer` column is populating with real values.
+
+### Other paths we considered (and rejected for now)
+
+- **TCP instead of UDP.** Pi-side change was ~7 lines, but LabVIEW's VI would have to be rewritten from UDP listener to TCP listener (stateful: accept → read loop → close, plus message framing). `SolarPowerMicro.vi` is an owned, production VI — risky to modify without the owner.
+- **Supabase ingestion from the Pi.** Got as far as drafting a `wind_readings` table + `requests.post` snippet replacing the UDP send. Would have bypassed the campus block via HTTPS. Not needed now that Wi-Fi works, but documented for future reference — this is still the best fallback if the Pi ever gets moved to a network that can't reach the iMac.
+- **Direct cable Pi ↔ iMac via USB-Ethernet.** Most self-contained (no IT, no cloud), but requires a hardware adapter and reconfiguring both ends to a private subnet. Overkill given Wi-Fi worked.
+
+### Infrastructure details captured in CLAUDE.md
+
+- Pi identity: `raspi3a@raspberrypi`, script at `/home/raspi3a/Desktop/AnemometerMPH22.py`
+- Pi dependency: `pigpio` (input pin 27, requires `pigpiod` daemon)
+- Harmless warning on Pi: `libEGL: DRI2 failed to authenticate` — matplotlib GPU init fallback
+
+### Dashboard stale warnings removed
+
+Cleaned up four places in the frontend that still claimed anemometer was offline / Pi was on the wrong network:
+
+- `src/components/dashboard/anemometer-chart.tsx`: badge is now conditional — `"Live"` when any reading > 0, `"Awaiting data"` otherwise. Removed the stale caveat paragraph.
+- `src/app/research/page.tsx`: removed the "anemometer unavailable" bullet from the methodology list.
+- `src/components/dashboard/research-view.tsx`: removed the `note` prop on the wind turbine subsystem tab.
+- `src/components/dashboard/academic-view.tsx`: removed "Wind speed (anemometer) is currently offline" from the methodology paragraph.
+
+`src/lib/mock-data.ts` still emits `anemometer: 0` — left as-is; mock is only used when Supabase is empty/unreachable.
+
+### IP correction
+
+Prior versions of `CLAUDE.md` listed the iMac as `140.232.228.188`. The correct value (per `ifconfig en0` on the iMac) is `140.232.220.180`. Updated both files. The `140.232.228.188` reference is likely a stale holdover from a DHCP lease or a different machine.
+
+### Open items
+
+- Verify anemometer values in Supabase's `readings.anemometer` column start being non-zero at the next `push_reading.py` cron run after the Pi's Wi-Fi change.
+- `solar2` Wi-Fi password is documented in CLAUDE.md and JOURNAL.md — consider moving it out of tracked docs if either file is ever pushed to a public repo.
+
+### Follow-up same day — WeatherFlow weather station integration scoped
+
+Professor mentioned other sensors spread across campus. José shared a Rogerson/Haddad-era Python script (`INSERT INTO WeatherFlow_Weather_Station_BP`) that pulls from the WeatherFlow REST API and pushes to MySQL on the Mac Mini.
+
+**Bugs found in the shared script** (likely explain why `WeatherFlow_Weather_Station_BP` is empty in MySQL):
+- `mydb.commit` missing parentheses — inserts silently roll back on `mydb.close()`
+- The `Weather_username = username_full.split(...)` line uses the MySQL credential variable instead of the WeatherFlow one; dead code because the API key is what actually authenticates
+- Response parsing assumes flat JSON (`jData.get('air_temperature')`) but WeatherFlow returns observations as positional arrays under `obs[0]` — so every field comes back `None`
+- No error handling on the API call
+
+**Live API test (04/22):**
+- The hardcoded key `20c70eae-e62f-4d3b-b3a4-8586e90f3ac8` is **not Clark's**. Listing stations with `GET /swd/rest/stations?api_key=...` returns exactly two stations — one in Texas ("County Rd 348", lat 29.38), one in California ("Lone Eagle Ln", lat 38.64). Neither is at Clark. The script's own comment even flags it: *"we need our own API key (contact company for this) after development is finished."* The dev key was never replaced.
+- `device_id=11212` (hardcoded in the script) returns `404 NOT FOUND` — not on this key's authorized list.
+- Confirmed working: API reachable from José's Mac, response shape documented (Tempest `obs_st` = 22-element positional array; key positions: 0=timestamp, 2=wind_avg, 4=wind_direction, 6=station_pressure, 7=air_temperature, 8=relative_humidity, 9=brightness, 10=uv, 11=solar_radiation, 15=lightning_strike_count).
+
+**Read Rogerson & Haddad's Spring 2022 final project report (`FinalProjectTREJackNada.pdf`):**
+- Two Tempest stations installed Spring 2022: **Goddard Library roof** (hub on 5th floor by corner supply closet) and **Biophysics roof** (hub in 3rd floor Biophysics lab).
+- A dedicated Gmail account owns the WeatherFlow account. Gmail + WeatherFlow credentials are in the **ClarkTRE** GitHub org (private). Need to be added as a member.
+- Ingest scripts live in ClarkTRE repo **`Archived-Weather_Database-Push`** — contains both the regular 60s operation script and a daily integrity-check script.
+- Known hardware risk: even the predecessors (pre-2022) had dead batteries (Goddard) and dropped Wi-Fi (BP). The 2022 stations are 4 years old now — same failures plausible.
+
+**Decision:** pursue weather integration via Supabase (new `weather_readings` table + `push_weather.py`), not by reviving the MySQL pipeline. Consistent with the 2026-03-25 "Supabase as single source of truth" decision.
+
+**Next actions (not started):**
+1. Get added to the `ClarkTRE` GitHub organization.
+2. Pull the real API key + both `device_id`s from the credentials repo.
+3. Sign into `tempestwx.com` with the Clark Gmail to verify both stations are physically online.
+4. Only then write `push_weather.py` + Supabase schema + CURED panels.
+
+Documented all of the above in CLAUDE.md under a new "WeatherFlow Tempest Stations" subsection.
+
+---
+
+## Session — 2026-04-23
+
+### Anemometer broke at midnight, root-caused to LabVIEW UDP read loop
+
+José noticed the `anemometer` column went back to zero at 00:00 even though the Pi, the `solar2` Wi-Fi, and the Pi's script were all healthy. Triage:
+
+1. Pi still on `solar2`, still plotting MPH in Thonny → Pi-side fine.
+2. `sudo tcpdump -i any -n udp port 61557` on the iMac showed **packets actively arriving** from `192.168.2.8` (the Pi's NAT'd address on `solar2`, 3-byte `"0.0"` and 4-byte `"0.72"` payloads). Network path healthy.
+   - Side note: `solar2` is a NAT'd Wi-Fi, **not** the same subnet as the iMac's `140.232.220.0/24` — yesterday's docs implied same-subnet, but packets still route fine over NAT. Corrected in CLAUDE.md.
+3. `sudo lsof -iUDP:61557` showed LabVIEW (PID 407) holding the port → VI has the socket bound but isn't draining it. Other acquisition loops (solar, wind) were writing fine to today's PowCrv file, so the main loop was alive; only the UDP read loop stalled.
+
+**Fix:** Abort Execution (⌘+. in LabVIEW) then Run. Anemometer column started populating again within a minute.
+
+**Root cause (hypothesis, not verified):** LabVIEW's typical UDP Read pattern propagates `error in → error out` through the loop; a single error latches the loop into a silent-noop state that survives restarts of the inner code. A bad packet or transient failure at rollover (00:00:00) probably tripped it. Without a block-diagram fix (inserting an error-clear node inside the UDP loop), this is expected to recur at or around midnight.
+
+**Decision:** one problem at a time. Accept daily morning check for now. If it keeps happening, push back on whoever owns `SolarPowerMicro.vi` to add the error clear.
+
+### WeatherFlow integration — scoped, built, pending deploy
+
+José got access to the Clark WeatherFlow account (Gmail → `tempestwx.com`) and generated a personal access token. Full investigation:
+
+**What's live:**
+- Station 11212 `ClarkWeatherStationBP` at `(42.25025, -71.82419)` — confirmed Clark's. Tempest web UI shows live 17°C / 25% humidity / 755 mmHg / wind 20 km/h / UV 4.
+- Only one station registered under this account. No Goddard Library. Either unregistered, decommissioned, or on a different account.
+
+**Endpoint investigation:**
+- `/observations/device/38862` → `obs: null`. The only device paired to this station is hub `HB-00000220`; no `ST` (Tempest) device in the registration, even though a physical Tempest is clearly reporting (confirmed by the web UI showing live data). Device registration is stale — last modified June 2022.
+- `/observations/station/11212` → `"DATA_ERROR - location does not have capabilities"`.
+- `/better_forecast?station_id=11212` → **works**. Returns both `current_conditions` (live sensor data) and `forecast` (predictions). Despite the confusing endpoint name, `current_conditions` is real observational data, matched field-for-field against the web UI. This is the endpoint to use.
+
+**Fifth bug in the old Rogerson/Haddad script:** it hardcoded `device_id=11212`, but `11212` is the **station_id**, not a device_id. The script was doomed from day one — even with the correct API key, the URL pattern is wrong.
+
+**Architecture pivot:** originally planned an iMac cron Python script (`push_weather.py`) paralleling `push_reading.py`. José suggested Vercel cron instead — correctly. Benefits:
+- No lab hardware dependency — weather flows even if iMac is down/disconnected
+- Same repo, same language (TypeScript) as the frontend
+- No SSH / expect / deploy friction
+- Vercel Pro plan allows per-minute cron
+
+Also, my original justification for the pusher included "protects the token" — José pushed back that `.env` (server-only, non-`NEXT_PUBLIC_`) handles this. He's right. The remaining reasons to have a pusher are solid though: building history for charts, keeping the dashboard fast, resilience to WeatherFlow outages, and consistent polling cadence. Kept the architecture, moved to Vercel.
+
+**Shipped:**
+
+- `database/weather_schema.sql` — `weather_readings` table with clean named columns, unique index on `(station_id, recorded_at)` for idempotent inserts, public read/insert RLS.
+- `src/app/api/cron/fetch-weather/route.ts` — Next.js API route. Auth guard on `Authorization: Bearer $CRON_SECRET` (Vercel cron sends this automatically), nodejs runtime, force-dynamic. Hits `/better_forecast`, extracts `current_conditions`, upserts into Supabase with `ignoreDuplicates: true`.
+- `vercel.json` — `{ "crons": [{ "path": "/api/cron/fetch-weather", "schedule": "* * * * *" }] }`
+- CLAUDE.md updated with the new architecture, endpoint choice, and env var list.
+
+**Still needed from José:**
+1. Run `database/weather_schema.sql` in Supabase SQL editor.
+2. Add env vars in Vercel → Project Settings → Environment Variables (Production + Preview):
+   - `WEATHERFLOW_TOKEN=c82cee72-8a2f-475c-8a3e-a0570434aa6d`
+   - `SUPABASE_SERVICE_ROLE_KEY=<from Supabase dashboard>`
+   - `CRON_SECRET=<openssl rand -hex 32>`
+3. Deploy to Vercel; first cron fires within 1 minute.
+4. Verify rows in Supabase `weather_readings`, and watch a few Vercel cron runs to catch config issues.
+5. **Do not build the frontend panel yet.** Let 1–2 days of `weather_readings` accumulate so charts render with real ranges instead of mock-looking flatlines.
+
+**Open items carried over:**
+- Goddard Library station recovery (ask Professor Agosta).
+- Anemometer daily midnight failure (monitor; decide whether to fix the VI).
+- CURED weather dashboard panel (after data accumulates).

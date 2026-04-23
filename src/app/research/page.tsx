@@ -146,10 +146,6 @@ export default function ResearchPage() {
                 Sign conventions for AC grid power and battery current have{" "}
                 <strong>not been confirmed</strong> with Professor Agosta.
               </li>
-              <li>
-                Anemometer data is unavailable — the Raspberry Pi is on a
-                different Wi-Fi network than the iMac.
-              </li>
             </ul>
           </section>
         </div>
