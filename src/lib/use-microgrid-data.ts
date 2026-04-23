@@ -32,7 +32,10 @@ function zeroReadingsForDate(dateISO?: string | null): MicrogridReading[] {
 
   return Array.from({ length: 24 }, (_, h) => {
     const hh = String(h).padStart(2, "0")
+    const stamp = new Date(base)
+    stamp.setHours(h, 0, 0, 0)
     return {
+      recorded_at: stamp.toISOString(),
       time: `${hh}:00`,
       label: `${hh}:00`,
       hour: h,

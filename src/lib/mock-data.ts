@@ -21,12 +21,17 @@ import {
 function generateMockData(): MicrogridReading[] {
   seed = 42
   const data: MicrogridReading[] = []
+  const baseDate = new Date()
+  baseDate.setHours(0, 0, 0, 0)
 
   for (let i = 0; i < 96; i++) {
     const hour = i * 0.25
     const hourInt = Math.floor(hour)
     const minutes = (hour % 1) * 60
     const timeStr = `${String(hourInt).padStart(2, "0")}:${String(Math.round(minutes)).padStart(2, "0")}`
+
+    const stamp = new Date(baseDate)
+    stamp.setHours(hourInt, Math.round(minutes), 0, 0)
 
     const solarFraction = solarProfile(hour)
     const pvPow = solarFraction * 820 + noise(2)
@@ -45,6 +50,7 @@ function generateMockData(): MicrogridReading[] {
     const acCurr = acVolts > 0 ? acPow / acVolts : 0
 
     data.push({
+      recorded_at: stamp.toISOString(),
       time: timeStr,
       label: timeStr,
       hour,

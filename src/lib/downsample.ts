@@ -10,17 +10,22 @@ const MAX_CHART_POINTS = 500
  * Downsample an array of readings by averaging values in equal-sized time buckets.
  * If the data already has fewer points than MAX_CHART_POINTS, returns it unchanged.
  *
+ * Generic over T extends MicrogridReading so callers (e.g. the research view,
+ * which uses ResearchReading with extra wf_* fields) get back the same type
+ * they passed in. Extra fields on T are sampled from the bucket's midpoint
+ * rather than averaged — fine for slow-moving signals like weather.
+ *
  * The bucket size adapts to the data range:
  *   - 1 day  (~1440 pts) → 5-min buckets  → ~288 pts
  *   - 1 week (~10080 pts) → 15-min buckets → ~672 pts
  *   - 1 month (~43200 pts) → 1-hour buckets → ~720 pts
  */
-export function downsample(data: MicrogridReading[]): MicrogridReading[] {
+export function downsample<T extends MicrogridReading>(data: T[]): T[] {
   if (data.length <= MAX_CHART_POINTS) return data
 
   const bucketSize = Math.ceil(data.length / MAX_CHART_POINTS)
 
-  const result: MicrogridReading[] = []
+  const result: T[] = []
 
   for (let i = 0; i < data.length; i += bucketSize) {
     const bucket = data.slice(i, i + bucketSize)
@@ -30,8 +35,8 @@ export function downsample(data: MicrogridReading[]): MicrogridReading[] {
   return result
 }
 
-/** Average all numeric fields in a bucket, keeping the middle timestamp. */
-function averageBucket(bucket: MicrogridReading[]): MicrogridReading {
+/** Average MicrogridReading numeric fields; midpoint-sample any extras. */
+function averageBucket<T extends MicrogridReading>(bucket: T[]): T {
   const n = bucket.length
   const mid = bucket[Math.floor(n / 2)]
 
@@ -56,7 +61,12 @@ function averageBucket(bucket: MicrogridReading[]): MicrogridReading {
     anemometer += r.anemometer
   }
 
+  // Spread `mid` first so any extra fields on T (e.g. wf_wind_mph on a
+  // ResearchReading) are preserved; then override the MicrogridReading
+  // numeric fields with bucket averages.
   return {
+    ...mid,
+    recorded_at: mid.recorded_at,
     time: mid.time,
     label: mid.label,
     hour: mid.hour,

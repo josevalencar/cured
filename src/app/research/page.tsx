@@ -2,13 +2,15 @@
 
 import Image from "next/image"
 import Link from "next/link"
-import { useMicrogridData } from "@/lib/use-microgrid-data"
+import { useResearchData } from "@/lib/use-research-data"
 import { PublicMetrics } from "@/components/dashboard/public-metrics"
 import { SolarPowerChart } from "@/components/dashboard/solar-power-chart"
 import { BatteryChart } from "@/components/dashboard/battery-chart"
 import { WindTurbineChart } from "@/components/dashboard/wind-turbine-chart"
 import { AcGridChart } from "@/components/dashboard/ac-grid-chart"
 import { AnemometerChart } from "@/components/dashboard/anemometer-chart"
+import { WindCorrelationChart } from "@/components/dashboard/wind-correlation-chart"
+import { WeatherSummary } from "@/components/dashboard/weather-summary"
 import { DatePicker } from "@/components/dashboard/date-range-selector"
 import { format } from "date-fns"
 
@@ -19,9 +21,10 @@ export default function ResearchPage() {
     rawData,
     chartData,
     metrics,
+    latestWeather,
     isLive,
     loading,
-  } = useMicrogridData({ range: "today" })
+  } = useResearchData({ range: "today" })
 
   // The selected date as a JS Date object (for the picker UI)
   const selectedDate = selection.date ? new Date(selection.date + "T12:00:00") : new Date()
@@ -101,6 +104,17 @@ export default function ResearchPage() {
           </section>
 
           <section>
+            <h2 className="mb-1 text-2xl font-semibold tracking-tight">
+              Weather Station
+            </h2>
+            <p className="mb-4 text-sm text-muted-foreground">
+              Live atmospheric conditions from the Tempest sensor on the
+              Biophysics roof
+            </p>
+            <WeatherSummary latest={latestWeather} />
+          </section>
+
+          <section>
             <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-xl font-semibold tracking-tight">
@@ -131,6 +145,7 @@ export default function ResearchPage() {
               <WindTurbineChart data={chartData} />
               <AcGridChart data={chartData} />
               <AnemometerChart data={chartData} />
+              <WindCorrelationChart data={chartData} />
             </div>
           </section>
 

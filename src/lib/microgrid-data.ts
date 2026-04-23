@@ -54,6 +54,7 @@ function rowToReading(row: ReadingsRow, range: DateRange): MicrogridReading {
   }
 
   return {
+    recorded_at: row.recorded_at,
     time: timeStr,
     label,
     hour,
