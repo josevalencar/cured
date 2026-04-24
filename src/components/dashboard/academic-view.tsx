@@ -295,7 +295,7 @@ export function AcademicView({
 
           <ChartCard
             title="AC Grid Power"
-            subtitle="acPower (W) — sign convention unverified"
+            subtitle="acPower (W) — positive = export, negative = import"
           >
             <AcGridChart data={chartData} />
           </ChartCard>
@@ -317,8 +317,9 @@ export function AcademicView({
             sampled by a LabVIEW acquisition program at one-minute intervals.
             Solar energy is computed as Σ PVpow × (1/60) / 1000 for PVpow &gt; 5
             W. CO₂ avoided uses the EPA eGRID US-average emissions factor of
-            0.386 kg/kWh. Sign conventions for acPower and BattCurr are not yet
-            confirmed with Professor Agosta and are shown as recorded.
+            0.386 kg/kWh. Positive acPower = exporting to the utility;
+            negative = importing. Battery current sign convention is still
+            unconfirmed and is shown as recorded.
           </p>
         </section>
       </main>

@@ -19,6 +19,13 @@ export function PublicMetrics({ metrics }: PublicMetricsProps) {
           icon={<SunIcon />}
         />
         <MetricCard
+          title="Wind Turbines"
+          value={Math.max(metrics.currentHAWT, metrics.currentVAWT).toFixed(2)}
+          unit="V RMS"
+          description={`HAWT ${metrics.currentHAWT.toFixed(2)} V · VAWT ${metrics.currentVAWT.toFixed(2)} V`}
+          icon={<WindIcon />}
+        />
+        <MetricCard
           title="CO₂ Avoided Today"
           value={metrics.co2AvoidedKg.toFixed(2)}
           unit="kg"
@@ -27,38 +34,40 @@ export function PublicMetrics({ metrics }: PublicMetricsProps) {
           icon={<LeafIcon />}
         />
         <MetricCard
-          title="Battery Status"
-          value={metrics.batteryStatus}
-          unit=""
-          description={`${metrics.currentBatteryVoltage.toFixed(1)} V`}
-          badge={{
-            label:
-              metrics.batteryStatus === "Charging"
-                ? "Active"
-                : metrics.batteryStatus === "Discharging"
-                  ? "Active"
-                  : "Standby",
-            variant:
-              metrics.batteryStatus === "Idle" ? "secondary" : "default",
-          }}
+          title="Battery"
+          value={metrics.currentBatteryVoltage.toFixed(1)}
+          unit="V"
+          description={`Battery ${metrics.batteryStatus.toLowerCase()}`}
           icon={<BatteryIcon />}
-        />
-        <MetricCard
-          title="System Status"
-          value={metrics.systemOnline ? "Online" : "Offline"}
-          description={
-            metrics.systemOnline
-              ? "Microgrid is operational"
-              : "No active power flow detected"
-          }
-          badge={{
-            label: metrics.systemOnline ? "Running" : "Down",
-            variant: metrics.systemOnline ? "default" : "destructive",
-          }}
-          icon={<ActivityIcon />}
         />
       </div>
     </section>
+  )
+}
+
+export function SystemStatusIndicator({
+  metrics,
+}: {
+  metrics: DerivedMetrics
+}) {
+  return (
+    <span className="inline-flex items-center gap-2 text-sm">
+      <span className="text-muted-foreground">
+        <ActivityIcon />
+      </span>
+      <span className="font-medium">
+        {metrics.systemOnline ? "Online" : "Offline"}
+      </span>
+      <span
+        className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
+          metrics.systemOnline
+            ? "bg-clark-red text-white"
+            : "bg-red-100 text-red-800"
+        }`}
+      >
+        {metrics.systemOnline ? "Running" : "Down"}
+      </span>
+    </span>
   )
 }
 
@@ -100,6 +109,26 @@ function LeafIcon() {
   )
 }
 
+function WindIcon() {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="16"
+      height="16"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2" />
+      <path d="M9.6 4.6A2 2 0 1 1 11 8H2" />
+      <path d="M12.6 19.4A2 2 0 1 0 14 16H2" />
+    </svg>
+  )
+}
+
 function BatteryIcon() {
   return (
     <svg
@@ -113,8 +142,11 @@ function BatteryIcon() {
       strokeLinecap="round"
       strokeLinejoin="round"
     >
-      <rect width="16" height="10" x="2" y="7" rx="2" ry="2" />
-      <line x1="22" x2="22" y1="11" y2="13" />
+      <rect x="2" y="7" width="16" height="10" rx="2" />
+      <line x1="22" y1="11" x2="22" y2="13" />
+      <line x1="6" y1="11" x2="6" y2="13" />
+      <line x1="10" y1="11" x2="10" y2="13" />
+      <line x1="14" y1="11" x2="14" y2="13" />
     </svg>
   )
 }

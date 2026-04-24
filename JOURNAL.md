@@ -572,3 +572,25 @@ Build green (`next build` passes), deployed via auto-deploy to Vercel.
 - Goddard Library station recovery (unchanged).
 - Anemometer midnight failure (unchanged — check tomorrow morning to see if it recurs).
 - Turbine facing direction from Professor Agosta — once known, layer direction-aware visualization onto the correlation chart.
+
+### Sign convention resolved — acPower (same day)
+
+Professor Agosta confirmed: **positive `acPower` = exporting to the utility**, negative = importing. This matches what the curve shape suggested (acPower tracks the solar bell curve — peak export at midday, import at night), and overrides the old 2017 `htdocs_Old` comment that claimed positive = import.
+
+Updated labels across the dashboard:
+- `src/components/dashboard/ac-grid-chart.tsx` — description now says "Positive = exporting to utility; negative = importing from utility."
+- `src/components/dashboard/research-view.tsx` — AC grid tab note updated
+- `src/components/dashboard/academic-view.tsx` — ChartCard subtitle + methodology paragraph updated
+- `src/app/research/page.tsx` — data-notes bullet updated
+
+CLAUDE.md updated under *Known Data Issues* and *Open Questions*.
+
+**`BattCurr` sign convention is still open** — keep showing battery current as a raw number (not "Charging" / "Discharging" in interpreted form) until the professor confirms. The existing `batteryStatus` computation in `metrics` uses an assumed convention; leave it as a best-guess for now but be prepared to flip once we know.
+
+### Overview row layout — System Status promoted out of the card grid
+
+Pulled the System Status indicator out of the 4th metric card and promoted it into the section subtitle row (right-aligned, opposite "Clark University campus microgrid... Live"). Reads more like a top-level health pill than a metric, and frees the 4-column grid for actual measurements.
+
+Battery is now a first-class card in its place (voltage as the primary value, status — idle / charging / discharging — as the description), instead of being a side-note on the System Status card.
+
+Files: `src/components/dashboard/public-metrics.tsx` (new `SystemStatusIndicator` export, new Battery card, removed old System Status card), `src/app/research/page.tsx` (renders the indicator on the right of the subtitle row).

@@ -101,6 +101,8 @@ const ZERO_METRICS: DerivedMetrics = {
   systemOnline: false,
   currentSolarPower: 0,
   currentBatteryVoltage: 0,
+  currentHAWT: 0,
+  currentVAWT: 0,
 }
 
 /**

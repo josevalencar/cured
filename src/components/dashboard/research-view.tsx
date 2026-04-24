@@ -295,7 +295,7 @@ export function LearnSection({
                   { label: "peak |flow|", value: gridStats.peak, unit: "W" },
                   { label: "right now", value: gridStats.latest, unit: "W" },
                 ]}
-                note="Sign convention (import vs. export) is not yet confirmed. Treat ± as a measurement, not a claim."
+                note="Positive acPower = exporting to the utility; negative = importing from the utility."
                 chart={<AcGridChart data={chartData} />}
               />
             </TabsContent>

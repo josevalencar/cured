@@ -3,7 +3,10 @@
 import Image from "next/image"
 import Link from "next/link"
 import { useResearchData } from "@/lib/use-research-data"
-import { PublicMetrics } from "@/components/dashboard/public-metrics"
+import {
+  PublicMetrics,
+  SystemStatusIndicator,
+} from "@/components/dashboard/public-metrics"
 import { SolarPowerChart } from "@/components/dashboard/solar-power-chart"
 import { BatteryChart } from "@/components/dashboard/battery-chart"
 import { WindTurbineChart } from "@/components/dashboard/wind-turbine-chart"
@@ -91,15 +94,18 @@ export default function ResearchPage() {
             <h2 className="mb-1 text-2xl font-semibold tracking-tight">
               Microgrid Overview
             </h2>
-            <p className="mb-4 text-sm text-muted-foreground">
-              Clark University campus microgrid — solar, wind, battery, and
-              grid monitoring
-              {isLive && (
-                <span className="ml-2 inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
-                  Live
-                </span>
-              )}
-            </p>
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+              <p className="text-sm text-muted-foreground">
+                Clark University campus microgrid — solar, wind, battery, and
+                grid monitoring
+                {isLive && (
+                  <span className="ml-2 inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                    Live
+                  </span>
+                )}
+              </p>
+              <SystemStatusIndicator metrics={metrics} />
+            </div>
             <PublicMetrics metrics={metrics} />
           </section>
 
@@ -158,8 +164,9 @@ export default function ResearchPage() {
                 uses the EPA eGRID average US emissions factor of 0.386 kg/kWh.
               </li>
               <li>
-                Sign conventions for AC grid power and battery current have{" "}
-                <strong>not been confirmed</strong> with Professor Agosta.
+                AC grid power: positive = exporting to the utility; negative =
+                importing. The battery current sign convention is{" "}
+                <strong>not yet confirmed</strong>.
               </li>
             </ul>
           </section>

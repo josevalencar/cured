@@ -61,6 +61,10 @@ export interface DerivedMetrics {
   systemOnline: boolean
   currentSolarPower: number
   currentBatteryVoltage: number
+  /** Latest HAWT (horizontal-axis) RMS voltage, V. */
+  currentHAWT: number
+  /** Latest VAWT (vertical-axis) RMS voltage, V. */
+  currentVAWT: number
 }
 
 /** EPA eGRID average US grid emissions factor (kg CO₂ per kWh) */

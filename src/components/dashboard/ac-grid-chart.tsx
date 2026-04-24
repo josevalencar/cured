@@ -43,7 +43,8 @@ export function AcGridChart({ data }: AcGridChartProps) {
       <CardHeader>
         <CardTitle>AC Grid</CardTitle>
         <CardDescription>
-          Grid power flow (W) — sign convention not yet confirmed
+          Grid power flow (W). Positive = exporting to the utility; negative =
+          importing from the utility.
         </CardDescription>
       </CardHeader>
       <CardContent>

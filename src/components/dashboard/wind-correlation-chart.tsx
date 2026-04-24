@@ -1,9 +1,11 @@
 "use client"
 
+import { useMemo } from "react"
 import {
   CartesianGrid,
   ComposedChart,
   Line,
+  ReferenceArea,
   XAxis,
   YAxis,
 } from "recharts"
@@ -49,6 +51,11 @@ interface WindCorrelationChartProps {
   data: ResearchReading[]
 }
 
+/** Compass heading the HAWT/VAWT turbines face (Professor Agosta, 2026-04-23). */
+const TURBINE_FACING_DEG = 0 // North
+/** Half-width of the "favorable" wind cone centered on the turbine facing. */
+const FAVORABLE_TOLERANCE_DEG = 45
+
 /** Convert a compass bearing in degrees to a 16-point cardinal abbreviation. */
 function cardinal(deg: number): string {
   const dirs = [
@@ -59,6 +66,41 @@ function cardinal(deg: number): string {
   ]
   const idx = Math.round(((deg % 360) + 360) % 360 / 22.5) % 16
   return dirs[idx]
+}
+
+/** Shortest angular distance between two compass bearings, in degrees. */
+function angularDistance(a: number, b: number): number {
+  const diff = Math.abs(((a - b) % 360) + 360) % 360
+  return Math.min(diff, 360 - diff)
+}
+
+/** Wind direction is "favorable" when within the tolerance of the turbine facing. */
+function isFavorable(deg: number | null | undefined): boolean {
+  if (deg == null) return false
+  return angularDistance(deg, TURBINE_FACING_DEG) <= FAVORABLE_TOLERANCE_DEG
+}
+
+/**
+ * Compute contiguous x-ranges of favorable wind, expressed as XAxis label pairs.
+ * Used to render <ReferenceArea> shading on the chart.
+ */
+function favorableWindows(
+  data: ResearchReading[]
+): Array<{ x1: string; x2: string }> {
+  const windows: Array<{ x1: string; x2: string }> = []
+  let start: number | null = null
+  for (let i = 0; i < data.length; i++) {
+    const good = isFavorable(data[i].wf_wind_direction)
+    if (good && start === null) start = i
+    if (!good && start !== null) {
+      windows.push({ x1: data[start].label, x2: data[i - 1].label })
+      start = null
+    }
+  }
+  if (start !== null) {
+    windows.push({ x1: data[start].label, x2: data[data.length - 1].label })
+  }
+  return windows
 }
 
 /**
@@ -83,6 +125,8 @@ export function WindCorrelationChart({ data }: WindCorrelationChartProps) {
     (r) => r.wf_wind_mph != null && r.wf_wind_mph > 0
   )
   const latest = latestWithDirection(data)
+  const windows = useMemo(() => favorableWindows(data), [data])
+  const latestFavorable = latest ? isFavorable(latest.deg) : false
 
   return (
     <Card>
@@ -161,6 +205,18 @@ export function WindCorrelationChart({ data }: WindCorrelationChartProps) {
               }
             />
             <ChartLegend content={<ChartLegendContent />} />
+            {windows.map((w, i) => (
+              <ReferenceArea
+                key={`fav-${i}`}
+                yAxisId="mph"
+                x1={w.x1}
+                x2={w.x2}
+                fill="var(--battery)"
+                fillOpacity={0.08}
+                stroke="none"
+                ifOverflow="hidden"
+              />
+            ))}
             <Line
               yAxisId="mph"
               type="monotone"
@@ -198,21 +254,38 @@ export function WindCorrelationChart({ data }: WindCorrelationChartProps) {
             />
           </ComposedChart>
         </ChartContainer>
-        {latest && (
-          <p className="mt-3 text-xs text-muted-foreground">
-            Latest wind direction:{" "}
-            <span className="font-medium text-foreground">
-              {Math.round(latest.deg)}° ({cardinal(latest.deg)})
+        <p className="mt-3 text-xs text-muted-foreground">
+          {latest ? (
+            <>
+              Latest wind:{" "}
+              <span className="font-medium text-foreground">
+                {Math.round(latest.deg)}° ({cardinal(latest.deg)})
+              </span>
+              {latest.mph != null && <> at {latest.mph.toFixed(1)} mph</>}
+              .{" "}
+            </>
+          ) : null}
+          Turbines face{" "}
+          <span className="font-medium text-foreground">
+            N (0°)
+          </span>
+          ; the green bands mark wind within ±{FAVORABLE_TOLERANCE_DEG}° of that
+          heading — the window where turbine RMS output should respond most
+          strongly.{" "}
+          {latest && (
+            <span
+              className={
+                latestFavorable
+                  ? "font-medium text-[var(--battery)]"
+                  : "font-medium text-foreground"
+              }
+            >
+              {latestFavorable
+                ? "Current wind is on-axis."
+                : "Current wind is off-axis."}
             </span>
-            {latest.mph != null && (
-              <>
-                {" "}at {latest.mph.toFixed(1)} mph
-              </>
-            )}
-            . With turbine facing confirmed, favorable directions can be
-            highlighted on this chart.
-          </p>
-        )}
+          )}
+        </p>
       </CardContent>
     </Card>
   )

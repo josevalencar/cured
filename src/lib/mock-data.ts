@@ -153,6 +153,8 @@ export function computeMetrics(data: MicrogridReading[]): DerivedMetrics {
     systemOnline,
     currentSolarPower: latest?.PVpow ?? 0,
     currentBatteryVoltage: latest?.BattV ?? 0,
+    currentHAWT: latest?.HAWTrms ?? 0,
+    currentVAWT: latest?.VAWTrms ?? 0,
   }
 }
 
