@@ -41,6 +41,10 @@ export function DatePicker({ value, onChange, disabled }: DatePickerProps) {
             setOpen(false)
           }}
           disabled={(date) => date > new Date()}
+          captionLayout="dropdown"
+          startMonth={new Date(2021, 0)}
+          endMonth={new Date()}
+          defaultMonth={value ?? new Date()}
           initialFocus
         />
       </PopoverContent>

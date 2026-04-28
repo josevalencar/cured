@@ -8,6 +8,7 @@ import { SolarPowerChart } from "./solar-power-chart"
 import { BatteryChart } from "./battery-chart"
 import { WindTurbineChart } from "./wind-turbine-chart"
 import { AcGridChart } from "./ac-grid-chart"
+import { DatePicker } from "./date-range-selector"
 
 interface AcademicViewProps {
   chartData: MicrogridReading[]
@@ -17,14 +18,6 @@ interface AcademicViewProps {
   onSelectionChange: (sel: MicrogridSelection) => void
   isLive: boolean
   loading: boolean
-}
-
-function todayISO(): string {
-  const d = new Date()
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, "0")
-  const day = String(d.getDate()).padStart(2, "0")
-  return `${y}-${m}-${day}`
 }
 
 function computeRangeStats(data: MicrogridReading[]) {
@@ -180,27 +173,29 @@ export function AcademicView({
           </div>
 
           <div className="flex items-center gap-2">
-            <label
-              htmlFor="dateInput"
-              className="font-mono text-[10px] tracking-[0.15em] text-muted-foreground uppercase"
-            >
+            <span className="font-mono text-[10px] tracking-[0.15em] text-muted-foreground uppercase">
               or date
-            </label>
-            <input
-              id="dateInput"
-              type="date"
-              max={todayISO()}
-              value={selection.date ?? ""}
-              onChange={(e) => {
-                if (e.target.value) selectDate(e.target.value)
-                else selectRange("today")
+            </span>
+            <DatePicker
+              value={
+                selection.date
+                  ? (() => {
+                      const [y, m, d] = selection.date.split("-").map(Number)
+                      return new Date(y, m - 1, d)
+                    })()
+                  : undefined
+              }
+              onChange={(d) => {
+                if (!d) {
+                  selectRange("today")
+                  return
+                }
+                const y = d.getFullYear()
+                const m = String(d.getMonth() + 1).padStart(2, "0")
+                const day = String(d.getDate()).padStart(2, "0")
+                selectDate(`${y}-${m}-${day}`)
               }}
               disabled={loading}
-              className={`border px-2 py-1 font-mono text-[11px] text-foreground focus:border-clark-red focus:outline-none disabled:opacity-50 ${
-                selection.date
-                  ? "border-clark-red bg-clark-red/5"
-                  : "border-rule/40 bg-card"
-              }`}
             />
             {selection.date && (
               <button
