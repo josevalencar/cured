@@ -594,3 +594,63 @@ Pulled the System Status indicator out of the 4th metric card and promoted it in
 Battery is now a first-class card in its place (voltage as the primary value, status — idle / charging / discharging — as the description), instead of being a side-note on the System Status card.
 
 Files: `src/components/dashboard/public-metrics.tsx` (new `SystemStatusIndicator` export, new Battery card, removed old System Status card), `src/app/research/page.tsx` (renders the indicator on the right of the subtitle row).
+
+---
+
+## Session — 2026-04-28
+
+### Dashboard outage — LabVIEW silently dead since Apr 27
+
+Both views (public + research) showed no recent microgrid data. Initially considered as a bug in `push_reading.py` or in Supabase, but neither held up.
+
+SSH'd into the iMac (`microuser@140.232.220.180`). Findings, in order:
+- **Cron is still firing every minute** with no errors in `push_reading.log`.
+- **`push_reading.log` last entry: 2026-04-27 07:09:01.** Then silence — not a stack trace, just nothing.
+- **`oneline.txt` mtime: 2026-04-27 07:07:34.** Frozen.
+- **Most recent PowCrv data write:** Apr 27 07:03 in `2021/Apr27/PowCrv.005`. No `2021/Apr28/` folder exists.
+- **`DataDate.txt` still says `2026-04-27`** — LabVIEW never rolled the day.
+- **`uptime`: 1 day, 4:38** → iMac rebooted ~Apr 27 07:07 EDT, exactly when data froze.
+- **`ps aux | grep -i labview`: empty.** LabVIEW was not running. Reboot killed it; nothing relaunched it.
+
+The script is healthy: a manual run hit `already_pushed()`, returned silently. That's why the log just stops cleanly with no error — exactly the symptom of a frozen upstream source paired with a working dedup guard.
+
+LabVIEW is a GUI app — not safely restartable over SSH. Drafted an email for Professor Agosta to relaunch `SolarPowerMicro.vi` in person. Followup item: there's no auto-restart on boot. A launchd plist would prevent this exact failure mode. Not urgent.
+
+### Weather pipeline migrated from Vercel cron to iMac cron
+
+José decided to move WeatherFlow ingestion off Vercel and onto the iMac, joining `push_reading.py`. Reasons:
+1. **Handoff:** José isn't here next semester. Future students won't have access to his Vercel account. Keeping all ingestion on the lab iMac means the lab owns the entire pipeline end-to-end, no cloud account dependency.
+2. **Academic ownership:** consistent with the project's "lab runs the system" framing.
+
+I pushed back briefly — this is the exact tradeoff we documented on 2026-04-23 in favor of Vercel, and we were watching the failure mode happen in real time (LabVIEW dead, but Vercel cron still happily filling `weather_readings` on schedule). Reliability decreases with this move. José weighed it and stuck with the handoff argument. Logged for future reference.
+
+**Shipped:**
+
+- `database/push_weather.py` — checked-in script, placeholder env vars (mirrors `push_reading.py` style: stdlib only, `urllib`, no pip)
+- `/Users/microuser/push_weather.py` on iMac — same script with credentials baked inline (Supabase URL, service-role key, `WEATHERFLOW_TOKEN`, `STATION_ID=11212`)
+- Crontab on iMac extended with `* * * * * /usr/bin/python3 /Users/microuser/push_weather.py >> /Users/microuser/push_weather.log 2>&1`
+- Dedup state file at `/Users/microuser/.last_push_weather_time` (epoch seconds of last `current_conditions.time`)
+
+**Verified:** manual run inserted a row, Supabase responded `201 Created`, `temp=18.0°C`, `wind_avg=4.0 m/s`. Cron now firing alongside `push_reading.py`.
+
+**Removed (Vercel side):**
+- `vercel.json` deleted (only contained the cron entry)
+- `src/app/api/cron/fetch-weather/route.ts` deleted, empty `src/app/api/` cleaned up
+- José still needs to remove `WEATHERFLOW_TOKEN`, `CRON_SECRET`, `SUPABASE_SERVICE_ROLE_KEY` from Vercel project env vars (frontend keeps `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` only)
+
+CLAUDE.md updated to reflect the new architecture (Vercel cron section replaced with iMac cron).
+
+### Implementation note — Supabase upsert from `urllib`
+
+The TS route used `supabase-js` `.upsert(row, { onConflict: "station_id,recorded_at", ignoreDuplicates: true })`. From plain `urllib` we get the same behavior with PostgREST directly:
+- URL: `/rest/v1/weather_readings?on_conflict=station_id,recorded_at`
+- Header: `Prefer: resolution=ignore-duplicates,return=minimal`
+
+Same idempotent insert, no SDK needed. `push_reading.py` doesn't need this because its dedup is purely local — it just skips the call entirely on unchanged `date_s`.
+
+### Open items
+- Restart LabVIEW on the iMac (waiting on Professor Agosta).
+- Add a launchd plist on the iMac to auto-relaunch `SolarPowerMicro.vi` on boot — eliminates the silent-outage class of failure.
+- Goddard Library station recovery (still open from 2026-04-23).
+- Anemometer midnight-failure recurrence (still open from 2026-04-23).
+- Once microgrid data resumes, verify the dashboard repopulates without code changes.
