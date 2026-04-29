@@ -648,9 +648,57 @@ The TS route used `supabase-js` `.upsert(row, { onConflict: "station_id,recorded
 
 Same idempotent insert, no SDK needed. `push_reading.py` doesn't need this because its dedup is purely local — it just skips the call entirely on unchanged `date_s`.
 
+### Historical backfill — 5 years of PowCrv files into Supabase
+
+After the weather migration, backfilled all historical microgrid files. Goal: dashboard should show any past date, not just data from when Supabase ingestion started (2026-03-25).
+
+**Pre-flight:**
+- `readings` table had no uniqueness constraint on `date_s`. Re-running a backfill would have created duplicates, and `push_reading.py` itself had no server-side guard. Added `UNIQUE INDEX readings_date_s_key (date_s)`. First attempt failed with a duplicate key (`3857309004.45693`) — pre-existing duplicates from earlier `push_reading.py` runs. Deduped with `DELETE FROM readings a USING readings b WHERE a.date_s = b.date_s AND a.id > b.id`, then the index built cleanly. Backfill became idempotent: PostgREST `?on_conflict=date_s` + `Prefer: resolution=ignore-duplicates`.
+
+**Format discovery — 26 vs 27 columns:**
+- Smoke test on `2021/Apr27/` flagged that PowCrv.001 (2022) and .002 (2023) parsed as 0 rows. Headers showed: 26-column files use the same schema as the modern 27-column format, **minus the trailing `anemometer` column**. The anemometer column was added in 2024 (PowCrv.003 onward). This resolves an open question that had been in CLAUDE.md.
+- Patched `parse_row` to accept either width: 27 → all columns mapped; 26 → all except anemometer (which becomes NULL).
+
+**Script — `database/backfill_readings.py`:**
+- Walks `/Users/microuser/Data/2021/**/PowCrv.*` (1,101 files).
+- Computes `recorded_at` from `date_s` (LabVIEW epoch UTC = `date_s - 2082844800` seconds since Unix epoch, also UTC).
+- Defensive about NaN/Inf (replaced with NULL before JSON serialization with `allow_nan=False`).
+- Batches of 500 rows per POST, exponential-backoff retries on HTTP errors.
+- Stdlib only, mirrors `push_reading.py` / `push_weather.py` style.
+
+**Run:** kicked off `nohup` on the iMac. Monitored progress via SSH `tail -F` filtered to every 50th file. Finished in ~21 minutes. Final tally:
+
+| Year | Rows | Approx. days of recording |
+|---|---|---|
+| 2021 | 137,691 | ~96 |
+| 2022 | 423,712 | ~294 |
+| 2023 | 453,465 | ~315 |
+| 2024 | 271,961 | ~189 |
+| 2025 | 303,418 | ~211 |
+| 2026 | 122,066 | ~85 |
+| **Total** | **1,712,313** | **~1,189 days ≈ 3.25 years of continuous data** |
+
+Across the ~5 calendar-year span, that's roughly 65% LabVIEW uptime. 2024 has the largest gap.
+
+**Surprise:** there *is* 2021 data in the dataset (137k rows), even though I had assumed all files under `Data/2021/` started at `PowCrv.001 = 2022`. Some folders contain unnumbered or differently-named PowCrv files that decoded into 2021 timestamps. Bonus year.
+
+### Date picker upgrade
+
+With 5 years of data in Supabase, navigating older dates was painful. Two surfaces had a date picker:
+- `/research`: shadcn `Calendar` inside a `Popover` — only chevron paging, no jump.
+- Academic view: native `<input type="date">` — varies wildly across browsers, no consistent year navigation.
+
+Both replaced/upgraded:
+
+- `src/components/dashboard/date-range-selector.tsx`: added `captionLayout="dropdown"` to the `Calendar`, plus `startMonth={Jan 2021}` / `endMonth={today}` to bound the year dropdown to dates we actually have data for. Month and year are now dropdowns in the caption header.
+- `src/components/dashboard/academic-view.tsx`: dropped the native `<input type="date">`, swapped in the same `<DatePicker>` component used by `/research`. Removed the now-unused local `todayISO()` helper. Both views share one consistent picker.
+
+**Bug fixed mid-flight:** initially set the year floor to 2022. Then realized the backfill had pulled in 2021 data too. Adjusted the floor to 2021.
+
 ### Open items
 - Restart LabVIEW on the iMac (waiting on Professor Agosta).
 - Add a launchd plist on the iMac to auto-relaunch `SolarPowerMicro.vi` on boot — eliminates the silent-outage class of failure.
 - Goddard Library station recovery (still open from 2026-04-23).
 - Anemometer midnight-failure recurrence (still open from 2026-04-23).
 - Once microgrid data resumes, verify the dashboard repopulates without code changes.
+- Resolve the `acPower` and `BattCurr` sign conventions visually now that 5 years of data are queryable — patterns over time may make the conventions self-evident.
